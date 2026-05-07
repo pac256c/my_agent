@@ -3,11 +3,25 @@ from dotenv import load_dotenv
 from google import genai
 import argparse
 from google.genai import types
+from prompts import *
+from call_function import *
+from functions.get_file_content import *
+from functions.get_files_info import *
+from functions.run_python_file import *
+from functions.write_file import *
 
 def generate_content(client, messages, verbose):
     #can edit model here if needed
     model = "gemini-2.5-flash"
-    generated_content = client.models.generate_content(model=model, contents=messages)
+    generated_content = client.models.generate_content(
+        model=model, 
+        contents=messages, 
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            tools=[available_functions],
+            temperature=0
+        ),
+    )
     
     #print the generated response & number of tokens
     if generated_content.usage_metadata is not None:
@@ -15,6 +29,10 @@ def generate_content(client, messages, verbose):
             print(f"User prompt: {messages[-1].parts[-1].text}")
             print(f"Prompt tokens: {generated_content.usage_metadata.prompt_token_count}")
             print(f"Response tokens: {generated_content.usage_metadata.candidates_token_count}")
+        if generated_content.function_calls is not None:
+            for func_call in generated_content.function_calls:
+                print(func_call)
+                print(f"Called function: {func_call.name}({func_call.args})")
         print(f"Response: {generated_content.text}")
     else:
         raise RuntimeError("Response has empty usage metadata, likely a failed API request")
