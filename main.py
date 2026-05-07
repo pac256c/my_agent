@@ -30,9 +30,18 @@ def generate_content(client, messages, verbose):
             print(f"Prompt tokens: {generated_content.usage_metadata.prompt_token_count}")
             print(f"Response tokens: {generated_content.usage_metadata.candidates_token_count}")
         if generated_content.function_calls is not None:
+            func_call_result_arr = []
             for func_call in generated_content.function_calls:
-                print(func_call)
-                print(f"Called function: {func_call.name}({func_call.args})")
+                function_call_result = call_function(func_call, verbose)
+                if function_call_result.parts is None or len(function_call_result.parts) == 0:
+                    raise Exception("Error: function call result not reported")
+                if function_call_result.parts[0].function_response is None:
+                    raise Exception("Error: function call result is none")
+                if function_call_result.parts[0].function_response.response is None:
+                    raise Exception("Error: function call result string is none")
+                if verbose:
+                    print(f"-> {function_call_result.parts[0].function_response.response}")
+                func_call_result_arr.append(function_call_result.parts[0].function_response.response)
         print(f"Response: {generated_content.text}")
     else:
         raise RuntimeError("Response has empty usage metadata, likely a failed API request")
