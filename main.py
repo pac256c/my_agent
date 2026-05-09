@@ -23,14 +23,23 @@ def generate_content(client, messages, verbose):
         ),
     )
     
+    #add candidates to messages
+    if generated_content.candidates:
+        for candidate in generated_content.candidates:
+            messages.append(candidate.content)
+
     #print the generated response & number of tokens
     if generated_content.usage_metadata is not None:
         if verbose:
             print(f"User prompt: {messages[-1].parts[-1].text}")
             print(f"Prompt tokens: {generated_content.usage_metadata.prompt_token_count}")
             print(f"Response tokens: {generated_content.usage_metadata.candidates_token_count}")
-        if generated_content.function_calls is not None:
-            func_call_result_arr = []
+
+        if not generated_content.function_calls:
+            print(f"Response: {generated_content.text}")
+            return False
+        else:
+            func_responses = []
             for func_call in generated_content.function_calls:
                 function_call_result = call_function(func_call, verbose)
                 if function_call_result.parts is None or len(function_call_result.parts) == 0:
@@ -41,8 +50,11 @@ def generate_content(client, messages, verbose):
                     raise Exception("Error: function call result string is none")
                 if verbose:
                     print(f"-> {function_call_result.parts[0].function_response.response}")
-                func_call_result_arr.append(function_call_result.parts[0].function_response.response)
-        print(f"Response: {generated_content.text}")
+                func_responses.append(function_call_result.parts[0])
+        
+            #add results from function calls & the model to messages
+            messages.append(types.Content(role="user", parts=func_responses))
+            return True
     else:
         raise RuntimeError("Response has empty usage metadata, likely a failed API request")
 
@@ -65,7 +77,12 @@ def main():
     verbose = args.verbose
 
     #generate
-    generate_content(client, messages, verbose)
+    cont = True
+    for _ in range(20):
+        cont = generate_content(client, messages, verbose)
+        if not cont: break
+    if cont: raise Exception("Max number of iterations reached without solving prompt")
+
 
 
 if __name__ == "__main__":
